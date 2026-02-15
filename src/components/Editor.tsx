@@ -17,11 +17,13 @@ export function Editor({ content, onChange, isEmpty }: EditorProps) {
     );
   }
 
+  const safeContent = typeof content === 'string' ? content : '';
+
   return (
     <main className="flex-1 min-w-0 flex flex-col bg-slate-950">
       <div className="flex-1 flex flex-col p-6">
         <textarea
-          value={content}
+          value={safeContent}
           onChange={(e) => onChange(e.target.value)}
           className="flex-1 min-h-[200px] w-full resize-none rounded-lg border border-slate-700 bg-slate-900 px-4 py-3 text-slate-100 placeholder-slate-500 focus:border-slate-600 focus:outline-none focus:ring-1 focus:ring-slate-600"
           placeholder="Write your note... Use [[Note Title]] for wiki links."

@@ -3,10 +3,31 @@ import { Sidebar, Editor, GraphView } from './components';
 import { initialNotes, type Note } from './data/notes';
 import { extractLinks, generateGraphData } from './utils/graphParser';
 
+const STORAGE_KEY = 'mind-graph-notes';
+
+function loadNotes(): Note[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return initialNotes;
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed) || parsed.length === 0) return initialNotes;
+    const valid = parsed.every(
+      (n) => n && typeof n.id === 'string' && typeof n.title === 'string' && typeof n.content === 'string'
+    );
+    return valid ? (parsed as Note[]) : initialNotes;
+  } catch {
+    return initialNotes;
+  }
+}
+
 function App() {
-  const [notes, setNotes] = useState<Note[]>(initialNotes);
+  const [notes, setNotes] = useState<Note[]>(loadNotes);
   const [activeNoteId, setActiveNoteId] = useState<string | null>(null);
   const [showGraph, setShowGraph] = useState(false);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(notes));
+  }, [notes]);
 
   const activeNote = activeNoteId
     ? notes.find((n) => n.id === activeNoteId) ?? null
@@ -15,6 +36,24 @@ function App() {
   const graphData = useMemo(() => generateGraphData(notes), [notes]);
 
   const handleSelectNote = (id: string) => setActiveNoteId(id);
+
+  const addNote = () => {
+    const newNote: Note = {
+      id: Date.now().toString(),
+      title: 'Untitled Note',
+      content: '',
+    };
+    setNotes((prev) => [...prev, newNote]);
+    setActiveNoteId(newNote.id);
+  };
+
+  const deleteNote = (id: string) => {
+    const nextNotes = notes.filter((n) => n.id !== id);
+    setNotes(nextNotes);
+    setActiveNoteId((current) =>
+      current === id ? (nextNotes[0]?.id ?? null) : current
+    );
+  };
 
   const handleNodeClick = (nodeTitle: string) => {
     const note = notes.find((n) => n.title === nodeTitle);
@@ -26,10 +65,19 @@ function App() {
 
   const handleContentChange = (content: string) => {
     if (!activeNoteId) return;
+    const firstLine = (content.split('\n')[0] ?? '').trim();
+    const headerMatch = firstLine.match(/^#+\s*(.*)$/);
+    const titleFromHeader = headerMatch ? headerMatch[1].trim() : null;
+
     setNotes((prev) =>
-      prev.map((n) =>
-        n.id === activeNoteId ? { ...n, content } : n
-      )
+      prev.map((n) => {
+        if (n.id !== activeNoteId) return n;
+        const nextTitle =
+          titleFromHeader !== null && titleFromHeader !== ''
+            ? titleFromHeader
+            : n.title;
+        return { ...n, content, title: nextTitle };
+      })
     );
   };
 
@@ -45,6 +93,8 @@ function App() {
         notes={notes}
         activeNoteId={activeNoteId}
         onSelectNote={handleSelectNote}
+        onAddNote={addNote}
+        onDeleteNote={deleteNote}
         showGraph={showGraph}
         onToggleGraph={() => setShowGraph((v) => !v)}
       />
